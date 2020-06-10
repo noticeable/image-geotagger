@@ -41,8 +41,6 @@ Works on Windows, Linux and MacOS.
 
 * Must have a `DateTimeOriginal` value.
 
-_Note: this does not need to be accurate, as an offset can be defined when running the script._
-
 ### GPS Track Requirements
 
 Currently supported GPS track log file formats:

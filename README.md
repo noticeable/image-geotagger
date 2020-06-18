@@ -16,15 +16,23 @@ As such, it is often advantageous to capture a secondary GPS track using a dedic
 
 [Exiftool already offers the ability to do basic geotagging](https://exiftool.org/geotag.html).
 
+![Discard photos](/readme-images/discard-viz.jpg)
+
+![Normalise photos](/readme-images/normalisation-viz.jpg)
+
+There can also be issues around accuracy of geotagged images regardless of whether a separate track file is used. In this case, it might be the case that the user wants to 1) discard gps / images that are clearly corrupt (significantly off the standard deviation of path) or 2) normalise them between 
+
 Image Geotagger is a wrapper around this functionality with additional features we find useful during the geotagging process (e.g time corrections)
 
 ## How it works
 
-1. You create a GPS track and series of timelapse photos
-2. You define any timestamp offsets and how the script should write date
-3. The script compares timestamps between track and photo
-4. The script emberd the GPS track data into the EXIF of the image
-5. The script outputs a new panoramic photo with GPS metadata in the output directory defined
+1. You create a GPS track file (optional) and series of timelapse photos (geotagges if no gps track)
+2. If GPS track used, you define any timestamp offsets ([similar functionality to Image / Video timestamper](https://github.com/trek-view/image-video-timestamper))
+3. You define any discard and / or normalisation requirements
+4. The script compares timestamps between track and photo
+5. The script embeds the GPS track data into the EXIF of the image
+6. Based on normalisation or discard values entered, the script writes new GPS data or discards images
+7. The script outputs a new panoramic photo with GPS metadata in the output directory defined
 
 ## Requirements
 
@@ -59,27 +67,41 @@ Currently supported GPS track log file formats:
 
 ## Quick start guide
 
-### Aguements
+### Arguments
 
 **About modes**
 
-* Overwrite: Will overwrite any existing geotags in image photo files with data from GPS log
-* Missing: Will only add GPS tags to any photos in series that do no contain any geotags, and ignore photos with any existing geotags
+* -m mode
+	- Overwrite: Will overwrite any existing geotags in image photo files with data from GPS log
+	- Missing: Will only add GPS tags to any photos in series that do no contain any geotags, and ignore photos with any existing geotags
+
+* -d discard
+	- value in meters: the script will order the files into GPSDateTime order and calculate distance (horizontal) between photos. If distance calculated is greater than discard value set between photos, these photos will be considered corrupt and discarded
+
+* -n normalise: 
+	- value in meters. The script will order the files into GPSDateTime order and calculate distance (horizontal) between photos. If value greater than normalise value the script will find the midpoint between two photos either side in order and assign the midpoint as correct gps. Note for first and last photo it is impossible to calculate midpoint, hence if first / last connection exceeds normalise value set, these photos will be discarded.
+
+Note, you can use -d or -n arguments, but not both.
+
+* -o offset gps track times
+	- value in seconds to offset gps track. Can be either positive of negative.
 
 **About time offset**
 
-Sometimes the time on your GPS logger OR the camera itself might be incorrect. If you know by how far (number of seconds) the camera or GPS logger is incorrect.
+Sometimes the time on your GPS logger might be incorrect. If you know by how far (number of seconds) the GPS logger is incorrect you can correct it using a time offset.
 
 Image Geotagger requires the time of the image file to be within 1 second of any time reported in the GPS track otherwise it will not geotag an image. Image Geotagger will always match the closest time to that reported in image against GPS track.
 
-You can use an offset time (in seconds) to correct any bad times in clocks.
+If the datetimeoriginal value of your photos is incorrect, you should use [Image / Video timestamper to fix](https://github.com/trek-view/image-video-timestamper).
 
-Offset should be specified in seconds. For example, if the time on the camera is incorrect by +1 hour (value reported is actually 1 hour ahead of actual capture time) the offset would be -3600. If it was 1 hour behind, the offset would be +3600.
+You can use an offset time (in seconds) to correct any bad times in clocks for GPS timestamping.
+
+Offset should be specified in seconds. For example, if the time on the GPS is incorrect by +1 hour (value reported is actually 1 hour ahead of actual capture time) the offset would be -3600. If it was 1 hour behind, the offset would be +3600.
 
 ### Format
 
 ```
-python image-geotagger.py [IMAGE OR DIRECTORY OF IMAGES] [OPTIONAL TIME OFFSET] [GPS TRACK] [OPTIONAL TIME OFFSET] -mode [MODE] [OUTPUT PHOTO DIRECTORY]
+python image-geotagger.py [IMAGE OR DIRECTORY OF IMAGES] [GPS TRACK] -o [OPTIONAL TIME OFFSET] -m [MODE] -n [METERS FOR NORMLISATION TO HAPPEN] [OUTPUT PHOTO DIRECTORY]
 ```
 
 ### Examples

@@ -16,12 +16,6 @@ As such, it is often advantageous to capture a secondary GPS track using a dedic
 
 [Exiftool already offers the ability to do basic geotagging](https://exiftool.org/geotag.html).
 
-![Discard photos](/readme-images/discard-viz.jpg)
-
-![Normalise photos](/readme-images/normalisation-viz.jpg)
-
-There can also be issues around accuracy of geotagged images regardless of whether a separate track file is used. In this case, it might be the case that the user wants to 1) discard gps / images that are clearly corrupt (significantly off the standard deviation of path) or 2) normalise them between 
-
 Image Geotagger is a wrapper around this functionality with additional features we find useful during the geotagging process (e.g time corrections)
 
 ## How it works
@@ -30,9 +24,18 @@ Image Geotagger is a wrapper around this functionality with additional features 
 2. If GPS track used, you define any timestamp offsets ([similar functionality to Image / Video timestamper](https://github.com/trek-view/image-video-timestamper))
 3. You define any discard and / or normalisation requirements
 4. The script compares timestamps between track and photo
-5. The script embeds the GPS track data into the EXIF of the image
+5. The script embeds the GPS track data into the EXIF of the image and orders images in ascending time order
 6. Based on normalisation or discard values entered, the script writes new GPS data or discards images
 7. The script outputs a new panoramic photo with GPS metadata in the output directory defined
+
+
+### Limitations / Considerations
+
+**Estimations**
+
+
+
+
 
 ## Requirements
 
@@ -54,15 +57,6 @@ Works on Windows, Linux and MacOS.
 Currently supported GPS track log file formats:
 
 * GPX
-* NMEA (RMC, GGA, GLL and GSA sentences)
-* KML
-* IGC (glider format)
-* Garmin XML and TCX
-* Magellan eXplorist PMGNTRK
-* Honeywell PTNTHPR
-* Bramor gEO log
-* Winplus Beacon .TXT
-* GPS/IMU .CSV
 * [ExifTool .CSV file](https://exiftool.org/geotag.html#CSVFormat)
 
 ## Quick start guide
@@ -74,17 +68,32 @@ Currently supported GPS track log file formats:
 * -m mode
 	- Overwrite: Will overwrite any existing geotags in image photo files with data from GPS log
 	- Missing: Will only add GPS tags to any photos in series that do no contain any geotags, and ignore photos with any existing geotags
-
 * -d discard
 	- value in meters: the script will order the files into GPSDateTime order and calculate distance (horizontal) between photos. If distance calculated is greater than discard value set between photos, these photos will be considered corrupt and discarded
-
 * -n normalise: 
 	- value in meters. The script will order the files into GPSDateTime order and calculate distance (horizontal) between photos. If value greater than normalise value the script will find the midpoint between two photos either side in order and assign the midpoint as correct gps. Note for first and last photo it is impossible to calculate midpoint, hence if first / last connection exceeds normalise value set, these photos will be discarded.
-
-Note, you can use -d or -n arguments, but not both.
-
 * -o offset gps track times
-	- value in seconds to offset gps track. Can be either positive of negative.
+	- value in seconds to offset each gps track timestamp. Can be either positive of negative.
+
+**About discard and normalise**
+
+There can also be issues around accuracy of geotagged images regardless of whether a separate track file is used. In this case, the user might wants to 1) discard gps / images that are clearly corrupt (significantly off the standard deviation of path) or 2) normalise the points so they form a more linear line.
+
+![Discard photos](/readme-images/discard-viz.jpg)
+
+In the case of discard, the first 3 connections (photo time 0 to photo time 1 to photo time 2) will be analysed against the -d value. If both connection distance values are greater than -d (p1 to p2, and p2 to p3), then the middle photo is discarded. If only one distance value is grater than -d, then middle photo remains.
+
+The script then considers then next trio of images. In Example 1 this would be P3, P4 and P5 (because P2 was discarded). In example 2 this would be P2, P3 and P4 (because P2 not discarded)
+
+![Normalise photos](/readme-images/normalisation-viz.jpg)
+
+Normalise works in a similar was to discard where the first 3 connections (photo time 0 to photo time 1 to photo time 2) will be analysed against the -n value
+
+Note, you can use -d or -n arguments, but not both. If both connection distance values are greater than -n (p1 to p2, and p2 to p3), then the middle photo is normalised.  If only one distance value is grater than -n, then middle photo remains untouched.
+
+Normalisation essentially finds the midpoint between first and last connections in a trio (p1 to p3) and then assigns the returned lat / lon values to the middle photo (p2). The altitude for the normalised photo is also adjusted to the vertical midpoint of p1 and p3 ((alt p1 + alt p2) / 2 = alt p3).
+
+The script then considers then next trio of images. In both examples this would be P2, P3 and P4.
 
 **About time offset**
 

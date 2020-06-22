@@ -46,6 +46,7 @@ Works on Windows, Linux and MacOS.
 ### Software Requirements
 
 * Python version 3.6+
+* [Pandas](https://pandas.pydata.org/docs/): python -m pip install pandas
 * [exiftool](https://exiftool.org/)
 
 ### Image requirements

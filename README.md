@@ -47,6 +47,7 @@ Works on Windows, Linux and MacOS.
 
 * Python version 3.6+
 * [Pandas](https://pandas.pydata.org/docs/): python -m pip install pandas
+* [gpxpy](https://pypi.org/project/gpxpy/): python -m pip install gpxpy
 * [exiftool](https://exiftool.org/)
 
 ### Image requirements

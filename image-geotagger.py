@@ -15,7 +15,6 @@ from xml.etree import ElementTree
 import xml.sax
 import csv
 import datetime
-import dateutil.parser as dt_parser
 import ntpath
 import time
 

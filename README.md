@@ -110,12 +110,35 @@ Offset should be specified in seconds. For example, if the time on the GPS is in
 ### Format
 
 ```
-python image-geotagger.py [IMAGE OR DIRECTORY OF IMAGES] [GPS TRACK] -o [OPTIONAL TIME OFFSET] -m [MODE] -n [METERS FOR NORMLISATION TO HAPPEN] [OUTPUT PHOTO DIRECTORY]
+python image-geotagger.py -o [OPTIONAL TIME OFFSET] -m [MODE] -n [METERS FOR NORMLISATION TO HAPPEN] [IMAGE OR DIRECTORY OF IMAGES] [GPS TRACK] [OUTPUT PHOTO DIRECTORY]
 ```
 
 ### Examples
 
+`
+Python image-geotagger.py sample-images log.gpx output-images
+`
 
+After this you will get 9 images which has the geo info in the image properties.
+
+
+`
+Python image-geotagger.py -o 4 sample-images log.gpx output-images
+`
+
+After this you will get 9 images which has the geo info in the image properties. Here the in GeoTimeStamp, the second value is 4 seconds later than log.gpx
+
+`
+Python image-geotagger.py -d 6 sample-images log.gpx output-images
+`
+
+After this you will get 5 images. 4 images are discard becuase their distance are bigger than 6 meters.
+
+`
+Python image-geotagger.py -n 6 sample-images log.gpx output-images
+`
+
+After this you will get 9 images. 4 images are normalised and GPS latitude and longitude valudes are changed.
 
 ## Support 
 

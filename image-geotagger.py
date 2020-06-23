@@ -15,6 +15,7 @@ from xml.etree import ElementTree
 import xml.sax
 import csv
 import datetime
+import dateutil.parser as dt_parser
 import ntpath
 import time
 
@@ -66,8 +67,11 @@ def filter_metadata(metadata, keys):
     """
     dict_metadata = metadata['METADATA']
     for key in keys:
-        if dict_metadata[key]:
-            return False
+        try:
+            if dict_metadata[key]:
+                return False
+        except KeyError:
+            pass
     return True
 
 
@@ -298,9 +302,12 @@ def geo_tagger(args):
     # filter the images based on mode setting.
     if mode == 'missing':
         keys = ['Composite:GPSDateTime', 'Composite:GPSLatitude', 'Composite:GPSLongitude', 'Composite:GPSAltitude',
-                'Composite:GPSDateStamp', 'Composite:GPSTimeStamp', 'Composite:GPSTrack', 'Composite:GPSPitch',
-                'Composite:CameraElevationAngle', 'Composite:GPSRoll']
+                'EXIF:GPSDateStamp', 'EXIF:GPSTimeStamp']
         list_of_metadata = [metadata for metadata in list_of_metadata if filter_metadata(metadata, keys)]
+
+        if len(list_of_metadata) == 0:
+            input("""There isn't any missing tag file for geotagging.\n\nPress any key to quit...""")
+            quit()
 
     # Create dataframe from list_of_metadata with image name in column and metadata in other column
     df_images = pd.DataFrame(list_of_metadata)
@@ -329,9 +336,12 @@ def geo_tagger(args):
 
     if discard > 0:
         df_images = discard_track_logs(df_images, discard)
+        if len(df_images) == 0:
+            input("""All images has been discarded.\n\nPress any key to quit...""")
+            quit()
 
     if normalise > 0:
-        df_images = normalise_track_logs(df_images, normalise)
+        df_images = normalise_track_logs(df_images, normalise)           
 
     # For each image, write the GEO TAGS into EXIF
     print('Writing metadata to EXIF of qualified images...\n')

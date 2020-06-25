@@ -156,6 +156,7 @@ def get_geo_data_from_log(df_row, track_logs):
     """
     origin_date = datetime.datetime.strptime(df_row['ORIGINAL_DATETIME'], '%Y:%m:%d %H:%M:%S')
     result = min(track_logs, key=lambda log: abs(log["GPS_DATETIME"].replace(tzinfo=None) - origin_date))
+    print("Image Original Date time is {0} and the Nearest Log time is {1}".format(df_row['ORIGINAL_DATETIME'], result['GPS_DATETIME'].strftime("%Y:%m:%d %H:%M:%S")))
     return result
 
 
@@ -341,7 +342,7 @@ def geo_tagger(args):
             quit()
 
     if normalise > 0:
-        df_images = normalise_track_logs(df_images, normalise)           
+        df_images = normalise_track_logs(df_images, normalise)
 
     # For each image, write the GEO TAGS into EXIF
     print('Writing metadata to EXIF of qualified images...\n')

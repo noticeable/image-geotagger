@@ -72,8 +72,6 @@ Currently supported GPS track log file formats:
 	- value in meters: the script will order the files into GPSDateTime order and calculate distance (horizontal) between photos. If distance calculated is greater than discard value set between photos, these photos will be considered corrupt and discarded
 * -n normalise: 
 	- value in meters. The script will order the files into GPSDateTime order and calculate distance (horizontal) between photos. If value greater than normalise value the script will find the midpoint between two photos either side in order and assign the midpoint as correct gps. Note for first and last photo it is impossible to calculate midpoint, hence if first / last connection exceeds normalise value set, these photos will be discarded.
-* -o offset gps track times
-	- value in seconds to offset each gps track timestamp. Can be either positive of negative.
 
 **About discard and normalise**
 
@@ -94,18 +92,6 @@ Note, you can use -d or -n arguments, but not both. If both connection distance 
 Normalisation essentially finds the midpoint between first and last connections in a trio (p1 to p3) and then assigns the returned lat / lon values to the middle photo (p2). The altitude for the normalised photo is also adjusted to the vertical midpoint of p1 and p3 ((alt p1 + alt p2) / 2 = alt p3).
 
 The script then considers then next trio of images. In both examples this would be P2, P3 and P4.
-
-**About time offset**
-
-Sometimes the time on your GPS logger might be incorrect. If you know by how far (number of seconds) the GPS logger is incorrect you can correct it using a time offset.
-
-Image Geotagger requires the time of the image file to be within 1 second of any time reported in the GPS track otherwise it will not geotag an image. Image Geotagger will always match the closest time to that reported in image against GPS track.
-
-If the datetimeoriginal value of your photos is incorrect, you should use [Image / Video timestamper to fix](https://github.com/trek-view/image-video-timestamper).
-
-You can use an offset time (in seconds) to correct any bad times in clocks for GPS timestamping.
-
-Offset should be specified in seconds. For example, if the time on the GPS is incorrect by +1 hour (value reported is actually 1 hour ahead of actual capture time) the offset would be -3600. If it was 1 hour behind, the offset would be +3600.
 
 ### Format
 

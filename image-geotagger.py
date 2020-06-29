@@ -11,13 +11,12 @@ import argparse
 import sys
 import math
 from pathlib import Path
-from xml.etree import ElementTree
 import xml.sax
 import csv
 import datetime
-import dateutil.parser as dt_parser
 import ntpath
 import time
+import shutil
 
 import pandas as pd
 import gpxpy
@@ -42,23 +41,35 @@ def haversine(lon1, lat1, lon2, lat2):
     return distance
 
 
-def get_files(path, isdir):
+def get_files(path):
     """
     Return a list of files, or directories.
     """
     list_of_files = []
 
-    for item in os.listdir(path):
-        item_path = os.path.abspath(os.path.join(path, item))
-
-        if isdir:
-            if os.path.isdir(item_path):
-                list_of_files.append(item_path)
-        else:
-            if os.path.isfile(item_path):
-                list_of_files.append(item_path)
+    for p, r, files in os.walk(path):
+        for file in files:
+            list_of_files.append(os.path.join(p, file))
 
     return list_of_files
+
+
+def copy_files(input_path, output_path):
+    """
+    copy directories and files with same tree from input_path to output_path
+    """
+    print('Moving files to destination: {}'.format(output_path))
+    if os.path.isdir(os.path.abspath(output_path)):
+        shutil.rmtree(output_path)
+
+    try:
+        shutil.copytree(input_path, output_path)
+        # Directories are the same
+    except shutil.Error as e:
+        print('Directory not copied. Error: %s' % e)
+        # Any error saying that the directory doesn't exist
+    except OSError as e:
+        print('Directory not copied. Error: %s' % e)
 
 
 def filter_metadata(metadata, keys):
@@ -104,15 +115,14 @@ def validate_file_type(path):
             return 'xml'
         except:  # SAX' exceptions are not public
             pass
-        fh.seek(0)
 
-        try:
-            reader = csv.reader(fh)
-            return 'csv'
-        except csv.Error:
-            pass
+    try:
+        reader = csv.reader(open(path, 'rb'))
+        return 'csv'
+    except csv.Error:
+        pass
 
-        return 'file type is not correct'
+    return 'file type is not correct'
 
 
 def load_gps_track_log(log_path):
@@ -126,9 +136,19 @@ def load_gps_track_log(log_path):
         return False
     elif file_type == 'csv':
         # Parse exif csv file to dict list
-        with open(log_path, 'rb') as log_file:
+        with open(log_path, 'r', encoding='utf8') as log_file:
             reader = csv.DictReader(log_file)
-            track_logs = list(reader)
+            track_logs = []
+            for i in reader:
+                date_time = i.get('GPSDateTime')
+                if date_time:
+                    new_date_time = datetime.datetime.strptime(date_time, '%Y:%m:%d %H:%M:%SZ')
+                    i.update({
+                        'GPS_DATETIME': new_date_time.strftime('%Y:%m:%d %H:%M:%SZ'),
+                        'Latitude': i.get('GPSLatitude'),
+                        'Longitude': i.get('GPSLongitude')
+                    })
+                track_logs.append(i)
             return track_logs
     else:
         with open(log_path, 'r') as gpxfile:
@@ -156,7 +176,8 @@ def get_geo_data_from_log(df_row, track_logs):
     """
     origin_date = datetime.datetime.strptime(df_row['ORIGINAL_DATETIME'], '%Y:%m:%d %H:%M:%S')
     result = min(track_logs, key=lambda log: abs(log["GPS_DATETIME"].replace(tzinfo=None) - origin_date))
-    print("Image Original Date time is {0} and the Nearest Log time is {1}".format(df_row['ORIGINAL_DATETIME'], result['GPS_DATETIME'].strftime("%Y:%m:%d %H:%M:%S")))
+    print("Image Original Date time is {0} and the Nearest Log time is {1}".format(
+        df_row['ORIGINAL_DATETIME'], result['GPS_DATETIME'].strftime("%Y:%m:%d %H:%M:%S")))
     return result
 
 
@@ -209,40 +230,12 @@ def normalise_track_logs(df_images, normalise_distance):
     return df_images
 
 
-def clean_up_new_files(output_photo_directory, list_of_files):
-    '''
-    As Exiftool creates a copy of the original image when processing,
-    the new files are copied to the output directory,
-    original files are renamed to original filename.
-    '''
-
-    print('Cleaning up old and new files...')
-    if not os.path.isdir(os.path.abspath(output_photo_directory)):
-        os.mkdir(os.path.abspath(output_photo_directory))
-
-    for image in list_of_files:
-        image_head, image_name = ntpath.split(image)
-        try:
-            os.rename(image, os.path.join(os.path.abspath(output_photo_directory),
-                                          '{0}_calculated.{1}'.format(image_name.split('.')[0], image.split('.')[-1])))
-            os.rename(os.path.join(os.path.abspath(image_head), '{0}_original'.format(image_name)), image)
-        except PermissionError:
-            print("Image {0} is still in use by Exiftool's process or being moved'."
-                  " Waiting before moving it...".format(image_name))
-            time.sleep(3)
-            os.rename(image, os.path.join(os.path.abspath(output_photo_directory),
-                                          '{0}_calculated.{1}'.format(image_name.split('.')[0], image.split('.')[-1])))
-            os.rename(os.path.join(os.path.abspath(image_head), '{0}_original'.format(image_name)), image)
-
-    print('Output files saved to {0}'.format(os.path.abspath(output_photo_directory)))
-
-
 def geo_tagger(args):
     path = Path(__file__)
     input_photo_directory = os.path.abspath(args.input_path)
     log_path = os.path.abspath(args.gps_track_path)
     output_photo_directory = os.path.abspath(args.output_directory)
-    mode = args.mode
+    mode = args.mode.lower()
     discard = int(args.discard)
     normalise = int(args.normalise)
     offset = int(args.offset)
@@ -291,8 +284,11 @@ def geo_tagger(args):
     else:
         exiftool.executable = args.executable_path
 
+    # Copy all to output directory
+    copy_files(input_photo_directory, output_photo_directory)
+
     # Get files in directory
-    list_of_files = get_files(input_photo_directory, False)
+    list_of_files = get_files(output_photo_directory)
     print('{0} file(s) have been found in input directory'.format(len(list_of_files)))
 
     # Get metadata of each file in list_of_images
@@ -341,7 +337,7 @@ def geo_tagger(args):
             input("""All images has been discarded.\n\nPress any key to quit...""")
             quit()
 
-    if normalise > 0:
+    elif normalise > 0:
         df_images = normalise_track_logs(df_images, normalise)
 
     # For each image, write the GEO TAGS into EXIF
@@ -356,8 +352,6 @@ def geo_tagger(args):
                        bytes("{0}".format(row[1]['IMAGE_NAME']), 'utf-8'))
             et.execute(bytes('-GPSLongitude={0}'.format(row[1]['LONGITUDE']), 'utf-8'),
                        bytes("{0}".format(row[1]['IMAGE_NAME']), 'utf-8'))
-
-    clean_up_new_files(output_photo_directory, [image for image in df_images['IMAGE_NAME'].values])
 
     input('\nMetadata successfully added to images.\n\nPress any key to quit')
     quit()

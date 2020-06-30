@@ -15,8 +15,6 @@ import xml.sax
 import csv
 import datetime
 import ntpath
-import time
-import shutil
 
 import pandas as pd
 import gpxpy
@@ -54,22 +52,28 @@ def get_files(path):
     return list_of_files
 
 
-def copy_files(input_path, output_path):
+def clean_up_new_files(output_photo_directory, list_of_files):
     """
-    copy directories and files with same tree from input_path to output_path
+    As Exiftool creates a copy of the original image when processing,
+    the new files are copied to the output directory,
+    original files are renamed to original filename.
     """
-    print('Moving files to destination: {}'.format(output_path))
-    if os.path.isdir(os.path.abspath(output_path)):
-        shutil.rmtree(output_path)
 
-    try:
-        shutil.copytree(input_path, output_path)
-        # Directories are the same
-    except shutil.Error as e:
-        print('Directory not copied. Error: %s' % e)
-        # Any error saying that the directory doesn't exist
-    except OSError as e:
-        print('Directory not copied. Error: %s' % e)
+    print('Cleaning up old and new files...')
+    if not os.path.isdir(os.path.abspath(output_photo_directory)):
+        os.mkdir(os.path.abspath(output_photo_directory))
+
+    for image in list_of_files:
+        image_head, image_name = ntpath.split(image)
+        try:
+            os.rename(image, os.path.join(os.path.abspath(output_photo_directory),
+                                          '{0}.{1}'.format(image_name.split('.')[0], image.split('.')[-1])))
+            os.rename(os.path.join(os.path.abspath(image_head), '{0}_original'.format(image_name)), image)
+        except PermissionError:
+            print("Image {0} is still in use by Exiftool's process or being moved'."
+                  " Waiting before moving it...".format(image_name))
+
+    print('Output files saved to {0}'.format(os.path.abspath(output_photo_directory)))
 
 
 def filter_metadata(metadata, keys):
@@ -144,7 +148,7 @@ def load_gps_track_log(log_path):
                 if date_time:
                     new_date_time = datetime.datetime.strptime(date_time, '%Y:%m:%d %H:%M:%SZ')
                     i.update({
-                        'GPS_DATETIME': new_date_time.strftime('%Y:%m:%d %H:%M:%SZ'),
+                        'GPS_DATETIME': new_date_time,
                         'Latitude': i.get('GPSLatitude'),
                         'Longitude': i.get('GPSLongitude')
                     })
@@ -175,15 +179,22 @@ def get_geo_data_from_log(df_row, track_logs):
     Find match geo data from log
     """
     origin_date = datetime.datetime.strptime(df_row['ORIGINAL_DATETIME'], '%Y:%m:%d %H:%M:%S')
-    result = min(track_logs, key=lambda log: abs(log["GPS_DATETIME"].replace(tzinfo=None) - origin_date))
+    if track_logs:
+        result = min(track_logs, key=lambda log: abs(log["GPS_DATETIME"].replace(tzinfo=None) - origin_date))
+    else:
+        result = {
+            'GPS_DATETIME': origin_date,
+            'Latitude': df_row['METADATA'].get('GPSLatitude'),
+            'Longitude': df_row['METADATA'].get('GPSLongitude')
+        }
     print("Image Original Date time is {0} and the Nearest Log time is {1}".format(
         df_row['ORIGINAL_DATETIME'], result['GPS_DATETIME'].strftime("%Y:%m:%d %H:%M:%S")))
     return result
 
 
-def discard_track_logs(df_images, discard_distance):
+def generate_new_fields(df_images):
     """
-    Discard next images which distance is less than discard setting values
+    Add new fields for calculate
     """
     df_images['LATITUDE_PREV'] = df_images['LATITUDE'].shift(1)
     df_images['LONGITUDE_PREV'] = df_images['LONGITUDE'].shift(1)
@@ -193,6 +204,14 @@ def discard_track_logs(df_images, discard_distance):
 
     df_images['NEXT_DISTANCE'] = df_images['DISTANCE'].shift(-1)
     df_images.iat[-1, df_images.columns.get_loc('NEXT_DISTANCE')] = 0
+    return df_images
+
+
+def discard_track_logs(df_images, discard_distance):
+    """
+    Discard next images which distance is less than discard setting values
+    """
+    df_images = generate_new_fields(df_images)
 
     df_filtered_images = df_images.query('DISTANCE <= {0} or NEXT_DISTANCE <= {1}'
                                          .format(discard_distance, discard_distance))
@@ -204,17 +223,7 @@ def normalise_track_logs(df_images, normalise_distance):
     """
     normalise images geo position which distance is less than normalise setting values
     """
-    df_images['LATITUDE_PREV'] = df_images['LATITUDE'].shift(1)
-    df_images['LONGITUDE_PREV'] = df_images['LONGITUDE'].shift(1)
-    df_images['LATITUDE_NEXT'] = df_images['LATITUDE'].shift(-1)
-    df_images['LONGITUDE_NEXT'] = df_images['LONGITUDE'].shift(-1)
-
-    df_images['DISTANCE'] = df_images.apply(
-        lambda x: haversine(x['LONGITUDE'], x['LATITUDE'], x['LONGITUDE_PREV'], x['LATITUDE_PREV']), axis=1)
-    df_images.iat[0, df_images.columns.get_loc('DISTANCE')] = 0
-
-    df_images['NEXT_DISTANCE'] = df_images['DISTANCE'].shift(-1)
-    df_images.iat[-1, df_images.columns.get_loc('NEXT_DISTANCE')] = 0
+    df_images = generate_new_fields(df_images)
 
     df_images['LATITUDE'] = df_images.apply(lambda x:
                                             (x['LATITUDE_PREV'] + x['LATITUDE_NEXT']) / 2
@@ -233,7 +242,7 @@ def normalise_track_logs(df_images, normalise_distance):
 def geo_tagger(args):
     path = Path(__file__)
     input_photo_directory = os.path.abspath(args.input_path)
-    log_path = os.path.abspath(args.gps_track_path)
+    log_path = os.path.abspath(args.track_log) if args.track_log else None
     output_photo_directory = os.path.abspath(args.output_directory)
     mode = args.mode.lower()
     discard = int(args.discard)
@@ -255,17 +264,6 @@ def geo_tagger(args):
             input('Press any key to continue')
             quit()
 
-    # Validate log file exist
-    if not os.path.isfile(log_path):
-        if os.path.isfile(os.path.join(path.parent.resolve(), log_path)):
-            log_path = os.path.join(path.parent.resolve(), log_path)
-        else:
-            input('No valid input folder is given!\nInput folder {0} or {1} does not exist!'.format(
-                os.path.abspath(log_path),
-                os.path.abspath(os.path.join(path.parent.resolve(), log_path))))
-            input('Press any key to continue')
-            quit()
-
     print('The following input folder will be used:\n{0}'.format(input_photo_directory))
     print('The following output folder will be used:\n{0}'.format(output_photo_directory))
 
@@ -284,11 +282,8 @@ def geo_tagger(args):
     else:
         exiftool.executable = args.executable_path
 
-    # Copy all to output directory
-    copy_files(input_photo_directory, output_photo_directory)
-
     # Get files in directory
-    list_of_files = get_files(output_photo_directory)
+    list_of_files = get_files(input_photo_directory)
     print('{0} file(s) have been found in input directory'.format(len(list_of_files)))
 
     # Get metadata of each file in list_of_images
@@ -315,13 +310,10 @@ def geo_tagger(args):
     # Sort images
     df_images.sort_values('ORIGINAL_DATETIME', axis=0, ascending=True, inplace=True)
 
-    #########################
-    # Work with the resulting image dataframe to filter by time discard or normalise
-    track_logs = load_gps_track_log(log_path)
-
-    if not track_logs:
-        input("""GPS track log file is not correct or unsupported file.\n\nPress any key to quit...""")
-        quit()
+    track_logs = []
+    if log_path:
+        # Work with the resulting image dataframe to filter by time discard or normalise
+        track_logs = load_gps_track_log(log_path)
 
     # Apply offset to GPS DateTime
     if offset != 0:
@@ -353,6 +345,8 @@ def geo_tagger(args):
             et.execute(bytes('-GPSLongitude={0}'.format(row[1]['LONGITUDE']), 'utf-8'),
                        bytes("{0}".format(row[1]['IMAGE_NAME']), 'utf-8'))
 
+    clean_up_new_files(output_photo_directory, [image for image in df_images['IMAGE_NAME'].values])
+
     input('\nMetadata successfully added to images.\n\nPress any key to quit')
     quit()
 
@@ -364,8 +358,9 @@ if __name__ == '__main__':
                         action='store',
                         help='Path to input image or directory of images.')
 
-    parser.add_argument('gps_track_path',
+    parser.add_argument('-t', '--track-log',
                         action='store',
+                        default=None,
                         help='Path to GPS track log file.')
 
     parser.add_argument('-o', '--offset',
@@ -400,16 +395,17 @@ if __name__ == '__main__':
 
     parser.add_argument('output_directory',
                         action="store",
+                        default="",
                         help='Path to output folder.')
 
     parser.add_argument('--version',
                         action='version',
                         version='%(prog)s 1.0')
 
-    args = parser.parse_args()
+    input_args = parser.parse_args()
 
-    if args.discard and args.normalise:
+    if input_args.discard and input_args.normalise:
         input("""You can't use discard(-d) and normalise(-n) argument in same time.\n\nPress any key to quit...""")
         quit()
 
-    geo_tagger(args)
+    geo_tagger(input_args)

@@ -70,6 +70,8 @@ Currently supported GPS track log file formats:
 * -m mode
 	- Overwrite: Will overwrite any existing geotags in image photo files with data from GPS log
 	- Missing: Will only add GPS tags to any photos in series that do no contain any geotags, and ignore photos with any existing geotags
+* -t track log
+    - path of log file (can be csv, gpx).  
 * -d discard
 	- value in meters: the script will order the files into GPSDateTime order and calculate distance (horizontal) between photos. If distance calculated is greater than discard value set between photos, these photos will be considered corrupt and discarded
 * -n normalise: 

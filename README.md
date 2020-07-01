@@ -46,6 +46,8 @@ Works on Windows, Linux and MacOS.
 ### Software Requirements
 
 * Python version 3.6+
+* [Pandas](https://pandas.pydata.org/docs/): python -m pip install pandas
+* [gpxpy](https://pypi.org/project/gpxpy/): python -m pip install gpxpy
 * [exiftool](https://exiftool.org/)
 
 ### Image requirements
@@ -68,6 +70,8 @@ Currently supported GPS track log file formats:
 * -m mode
 	- Overwrite: Will overwrite any existing geotags in image photo files with data from GPS log
 	- Missing: Will only add GPS tags to any photos in series that do no contain any geotags, and ignore photos with any existing geotags
+* -t track log
+    - path of log file (can be csv, gpx).  
 * -d discard
 	- value in meters: the script will order the files into GPSDateTime order and calculate distance (horizontal) between photos. If distance calculated is greater than discard value set between photos, these photos will be considered corrupt and discarded
 * -n normalise: 
@@ -96,12 +100,35 @@ The script then considers then next trio of images. In both examples this would 
 ### Format
 
 ```
-python image-geotagger.py [IMAGE OR DIRECTORY OF IMAGES] [GPS TRACK] -o [OPTIONAL TIME OFFSET] -m [MODE] -n [METERS FOR NORMLISATION TO HAPPEN] [OUTPUT PHOTO DIRECTORY]
+python image-geotagger.py -o [OPTIONAL TIME OFFSET] -m [MODE] -n [METERS FOR NORMLISATION TO HAPPEN] [IMAGE OR DIRECTORY OF IMAGES] [GPS TRACK] [OUTPUT PHOTO DIRECTORY]
 ```
 
 ### Examples
 
+`
+Python image-geotagger.py sample-images log.gpx output-images
+`
 
+After this you will get 9 images which has the geo info in the image properties.
+
+
+`
+Python image-geotagger.py -o 4 sample-images log.gpx output-images
+`
+
+After this you will get 9 images which has the geo info in the image properties. Here the in GeoTimeStamp, the second value is 4 seconds later than log.gpx
+
+`
+Python image-geotagger.py -d 6 sample-images log.gpx output-images
+`
+
+After this you will get 5 images. 4 images are discard becuase their distance are bigger than 6 meters.
+
+`
+Python image-geotagger.py -n 6 sample-images log.gpx output-images
+`
+
+After this you will get 9 images. 4 images are normalised and GPS latitude and longitude valudes are changed.
 
 ## Support 
 

@@ -66,9 +66,9 @@ Currently supported GPS track track file formats:
 	- value in meters. The script will order the files into `GPSDateTime` order and calculate distance (horizontal) between photos. If value greater than normalise value the script will find the midpoint between two photos either side in order and assign the midpoint as correct gps. Note for first and last photo it is impossible to calculate midpoint, hence if first / last connection exceeds normalise value set, these photos will be discarded.
 * track log (`-t`) 
     - path of track file (can be csv, gpx).  
-* mode (`-m`) (_only required when using a track log_)
-	- `overwrite`: Will overwrite any existing geotags in image photo files with data from GPS log
-	- `missing`: Will only add GPS tags to any photos in series that do no contain any geotags, and ignore photos with any existing geotags
+* mode (`-m`) 
+	- `overwrite`: Will overwrite any existing geotags in image photo files with data from GPS log. If you are trying to rewrite gps tags that already exist in photos you must explicitly use this mode.
+	- `missing` (default): Will only add GPS tags to any photos in series that do no contain any geotags, and ignore photos with any existing geotags
 
 **About discard and normalise**
 
@@ -123,25 +123,25 @@ Remove the double quotes (`"`) around any directory path shown in the examples. 
 **Take a directory of images (`INPUT`) and discard (`-d`) any photos 5 meters from the track then output remaining images (to directory `OUTPUT_1`)**
 
 ```
-python image-geotagger.py -d 5 "INPUT" "OUTPUT_1"
+python image-geotagger.py -m overwrite -d 5 "INPUT" "OUTPUT_1"
 ````
 
 **Take a directory of images (`INPUT`) and normalise (`-n`) any photos 10 meters from the track then output (to directory `OUTPUT_2`)**
 
 ```
-python image-geotagger.py -n 10 "INPUT" "OUTPUT_2"
+python image-geotagger.py -m overwrite -n 10 "INPUT" "OUTPUT_2"
 ```
 
 **Take a directory of images (`INPUT`) and gpx track file (`GPS/track.gpx`) and stitch GPS points into images, overwriting (`-m overwrite`) any existing geodata then output (to directory `OUTPUT_3`)**
 
 ```
-python image-geotagger.py "INPUT" "GPS/track.gpx" -m overwrite "OUTPUT_3"
+python image-geotagger.py -m overwrite "INPUT" "GPS/track.gpx" "OUTPUT_3"
 ```
 
 **Take a directory of images (`INPUT`) and gpx track file (`GPS/track.gpx`) and stitch GPS points into images, only updating images with no exiting gps points (`-m missing`) then output (to directory `OUTPUT_4`)**
 
 ```
-python image-geotagger.py "INPUT" "GPS/track.gpx" -m missing "OUTPUT_4"
+python image-geotagger.py -m missing "INPUT" "GPS/track.gpx" "OUTPUT_4"
 ```
 
 **Take a directory of images (`INPUT`) and csv track file (`GPS/track.csv`) and stitch GPS points into images, overwriting (`-m overwrite`) any existing geodata and normalise (`-n`) any photos 10 meters from the track then output (to directory `OUTPUT_5`)**

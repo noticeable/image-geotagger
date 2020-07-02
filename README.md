@@ -138,16 +138,16 @@ python image-geotagger.py -m overwrite -n 10 "INPUT" "OUTPUT_2"
 python image-geotagger.py -m overwrite "INPUT" "GPS/track.gpx" "OUTPUT_3"
 ```
 
-**Take a directory of images (`INPUT`) and gpx track file (`GPS/track.gpx`) and stitch GPS points into images, only updating images with no exiting gps points (`-m missing`) then output (to directory `OUTPUT_4`)**
+**Take a directory of images (`INPUT`) and gpx track file (`"-t "GPS/track.csv"`) and stitch GPS points into images, only updating images with no exiting gps points (`-m missing`) then output (to directory `OUTPUT_4`)**
 
 ```
-python image-geotagger.py -m missing "INPUT" "GPS/track.gpx" "OUTPUT_4"
+python image-geotagger.py -m missing "INPUT" -t "GPS/track.gpx" "OUTPUT_4"
 ```
 
-**Take a directory of images (`INPUT`) and csv track file (`GPS/track.csv`) and stitch GPS points into images, overwriting (`-m overwrite`) any existing geodata and normalise (`-n`) any photos 10 meters from the track then output (to directory `OUTPUT_5`)**
+**Take a directory of images (`INPUT`) and csv track file (`-t "GPS/track.csv"`) and stitch GPS points into images, overwriting (`-m overwrite`) any existing geodata and normalise (`-n`) any photos 10 meters from the track then output (to directory `OUTPUT_5`)**
 
 ```
-python image-geotagger.py -m overwrite -n 5 "INPUT" "GPS/track.csv" "OUTPUT_5"
+python image-geotagger.py -m overwrite -n 5 "INPUT" -t "GPS/track.csv" "OUTPUT_5"
 ```
 
 ## Support 

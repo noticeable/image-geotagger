@@ -192,7 +192,11 @@ def get_geo_data_from_log(df_row, track_logs):
     if track_logs:
         track_idx = df_row.name
         if len(track_logs) > track_idx:
-            result = track_logs[track_idx]
+            result = {
+                'GPS_DATETIME': track_logs[track_idx].get('GPS_DATETIME'),
+                'Latitude': track_logs[track_idx].get('Latitude'),
+                'Longitude': track_logs[track_idx].get('Longitude')
+            }
             print("Image Original Date time is {0} and the Log time is {1}".format(
                 df_row['ORIGINAL_DATETIME'], result['GPS_DATETIME'].strftime("%Y:%m:%d %H:%M:%S")))
         else:

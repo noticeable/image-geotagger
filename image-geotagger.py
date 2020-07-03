@@ -217,7 +217,7 @@ def get_geo_data_from_log(df_row, track_logs):
             print("Can not set image: {} as track log are not enough to update.".format(df_row['IMAGE_NAME']))
     else:
         result = {
-            'GPS_DATETIME': origin_date,
+            'GPS_DATETIME': None,
             'Latitude': df_row['METADATA'].get('Composite:GPSLatitude'),
             'Longitude': df_row['METADATA'].get('Composite:GPSLongitude'),
             'Altitude': df_row['METADATA'].get('Composite:GPSAltitude')
@@ -387,10 +387,11 @@ def geo_tagger(args):
     print('Writing metadata to EXIF of qualified images...\n')
     with exiftool.ExifTool(win_shell=is_win_shell) as et:
         for row in df_images.iterrows():
-            et.execute(bytes('-GPSTimeStamp={0}'.format(row[1]['GPS_DATETIME'].strftime("%H:%M:%S")), 'utf-8'),
-                       bytes("{0}".format(row[1]['IMAGE_NAME']), 'utf-8'))
-            et.execute(bytes('-GPSDateStamp={0}'.format(row[1]['GPS_DATETIME'].strftime("%Y:%m:%d")), 'utf-8'),
-                       bytes("{0}".format(row[1]['IMAGE_NAME']), 'utf-8'))
+            if row[1]['GPS_DATETIME']:
+                et.execute(bytes('-GPSTimeStamp={0}'.format(row[1]['GPS_DATETIME'].strftime("%H:%M:%S")), 'utf-8'),
+                           bytes("{0}".format(row[1]['IMAGE_NAME']), 'utf-8'))
+                et.execute(bytes('-GPSDateStamp={0}'.format(row[1]['GPS_DATETIME'].strftime("%Y:%m:%d")), 'utf-8'),
+                           bytes("{0}".format(row[1]['IMAGE_NAME']), 'utf-8'))
             et.execute(bytes('-GPSLatitude={0}'.format(row[1]['LATITUDE']), 'utf-8'),
                        bytes("{0}".format(row[1]['IMAGE_NAME']), 'utf-8'))
             et.execute(bytes('-GPSLongitude={0}'.format(row[1]['LONGITUDE']), 'utf-8'),

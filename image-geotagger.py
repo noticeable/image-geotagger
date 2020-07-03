@@ -158,7 +158,6 @@ def load_gps_track_log(log_path):
                     loaded_points += 1
                 else:
                     removed_points += 1
-            return track_logs
     else:
         with open(log_path, 'r') as gpxfile:
             gpxfile.seek(0)
@@ -191,7 +190,7 @@ def get_geo_data_from_log(df_row, track_logs):
     """
     origin_date = datetime.datetime.strptime(df_row['ORIGINAL_DATETIME'], '%Y:%m:%d %H:%M:%S')
     if track_logs:
-        track_idx = df_row.name - 1
+        track_idx = df_row.name
         if len(track_logs) > track_idx:
             result = track_logs[track_idx]
             print("Image Original Date time is {0} and the Log time is {1}".format(
@@ -332,6 +331,7 @@ def geo_tagger(args):
 
     # Sort images
     df_images.sort_values('ORIGINAL_DATETIME', axis=0, ascending=True, inplace=True)
+    df_images = df_images.reset_index(drop=True)
 
     track_logs = []
     if log_path:

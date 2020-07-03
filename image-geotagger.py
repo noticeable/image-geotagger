@@ -193,7 +193,6 @@ def get_geo_data_from_log(df_row, track_logs):
     """
     Find match geo data from log
     """
-    origin_date = datetime.datetime.strptime(df_row['ORIGINAL_DATETIME'], '%Y:%m:%d %H:%M:%S')
     if track_logs:
         track_idx = df_row.name
         if len(track_logs) > track_idx:
@@ -217,7 +216,7 @@ def get_geo_data_from_log(df_row, track_logs):
             print("Can not set image: {} as track log are not enough to update.".format(df_row['IMAGE_NAME']))
     else:
         result = {
-            'GPS_DATETIME': None,
+            'GPS_DATETIME': 0,
             'Latitude': df_row['METADATA'].get('Composite:GPSLatitude'),
             'Longitude': df_row['METADATA'].get('Composite:GPSLongitude'),
             'Altitude': df_row['METADATA'].get('Composite:GPSAltitude')

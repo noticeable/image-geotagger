@@ -223,8 +223,7 @@ def generate_new_fields(df_images):
         lambda x: haversine(x['LONGITUDE'], x['LATITUDE'], x['LONGITUDE_PREV'], x['LATITUDE_PREV']), axis=1)
     df_images.iat[0, df_images.columns.get_loc('DISTANCE')] = 0
 
-    df_images['NEXT_DISTANCE'] = df_images['DISTANCE'].shift(-1)
-    df_images.iat[-1, df_images.columns.get_loc('NEXT_DISTANCE')] = 0
+    df_images['NEXT_DISTANCE'] = df_images['DISTANCE'].shift(-1, fill_value=0)
     return df_images
 
 
@@ -239,12 +238,17 @@ def discard_track_logs(df_images, discard_distance):
     return df_filtered_images
 
 
-def get_middle_point(df_row, key, normalise_distance):
-    next_key = ('{}_next'.format(key)).upper()
-    prev_key = ('{}_prev'.format(key)).upper()
-    return (df_row[prev_key] + df_row[next_key]) / 2 \
-        if df_row['DISTANCE'] > normalise_distance and df_row['NEXT_DISTANCE'] > normalise_distance\
-        else df_row[key]
+def get_middle_point(df_row, normalise_distance):
+    if df_row['DISTANCE'] > normalise_distance and df_row['NEXT_DISTANCE'] > normalise_distance:
+        return pd.Series([
+            (df_row[('{}_next'.format(key)).upper()] + df_row[('{}_prev'.format(key)).upper()]) / 2
+            for key in ['LATITUDE', 'LONGITUDE']
+        ])
+    else:
+        return pd.Series([
+            df_row[key]
+            for key in ['LATITUDE', 'LONGITUDE']
+        ])
 
 
 def normalise_track_logs(df_images, normalise_distance):
@@ -256,8 +260,7 @@ def normalise_track_logs(df_images, normalise_distance):
     df_images['LATITUDE_NEXT'] = df_images['LATITUDE'].shift(-1, fill_value=df_images['LATITUDE'][df_images_len])
     df_images['LONGITUDE_NEXT'] = df_images['LONGITUDE'].shift(-1, fill_value=df_images['LONGITUDE'][df_images_len])
 
-    df_images['LATITUDE'] = df_images.apply(lambda x: get_middle_point(x, 'LATITUDE', normalise_distance), axis=1)
-    df_images['LONGITUDE'] = df_images.apply(lambda x: get_middle_point(x, 'LONGITUDE', normalise_distance), axis=1)
+    df_images[['LATITUDE', 'LONGITUDE']] = df_images.apply(lambda x: get_middle_point(x, normalise_distance), axis=1)
 
     return df_images
 

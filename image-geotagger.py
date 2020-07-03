@@ -147,12 +147,16 @@ def load_gps_track_log(log_path):
             reader = csv.DictReader(log_file)
             for i in reader:
                 date_time = i.get('GPSDateTime')
-                if date_time:
+                latitude = i.get('GPSLatitude')
+                longitude = i.get('GPSLongitude')
+                altitude = i.get('GPSAltitude')
+                if date_time and latitude and longitude:
                     new_date_time = datetime.datetime.strptime(date_time, '%Y:%m:%d %H:%M:%SZ')
                     i.update({
                         'GPS_DATETIME': new_date_time,
-                        'Latitude': i.get('GPSLatitude'),
-                        'Longitude': i.get('GPSLongitude')
+                        'Latitude': float(latitude),
+                        'Longitude': float(longitude),
+                        'Altitude': float(altitude) if altitude else None
                     })
                     track_logs.append(i)
                     loaded_points += 1
@@ -171,6 +175,7 @@ def load_gps_track_log(log_path):
                                     'GPS_DATETIME': point.time,
                                     'Latitude': point.latitude,
                                     'Longitude': point.longitude,
+                                    'Altitude': None
                                 }
                                 track_logs.append(track_data)
                                 loaded_points += 1
@@ -192,10 +197,13 @@ def get_geo_data_from_log(df_row, track_logs):
     if track_logs:
         track_idx = df_row.name
         if len(track_logs) > track_idx:
+            current_track = track_logs[track_idx]
+            altitude = current_track.get('Altitude')
             result = {
-                'GPS_DATETIME': track_logs[track_idx].get('GPS_DATETIME'),
-                'Latitude': track_logs[track_idx].get('Latitude'),
-                'Longitude': track_logs[track_idx].get('Longitude')
+                'GPS_DATETIME': current_track.get('GPS_DATETIME'),
+                'Latitude': current_track.get('Latitude'),
+                'Longitude': current_track.get('Longitude'),
+                'Altitude': altitude if altitude else df_row['METADATA'].get('Composite:GPSAltitude')
             }
             print("Image Original Date time is {0} and the Log time is {1}".format(
                 df_row['ORIGINAL_DATETIME'], result['GPS_DATETIME'].strftime("%Y:%m:%d %H:%M:%S")))
@@ -203,14 +211,16 @@ def get_geo_data_from_log(df_row, track_logs):
             result = {
                 'GPS_DATETIME': None,
                 'Latitude': None,
-                'Longitude': None
+                'Longitude': None,
+                'Altitude': None
             }
             print("Can not set image: {} as track log are not enough to update.".format(df_row['IMAGE_NAME']))
     else:
         result = {
             'GPS_DATETIME': origin_date,
             'Latitude': df_row['METADATA'].get('Composite:GPSLatitude'),
-            'Longitude': df_row['METADATA'].get('Composite:GPSLongitude')
+            'Longitude': df_row['METADATA'].get('Composite:GPSLongitude'),
+            'Altitude': df_row['METADATA'].get('Composite:GPSAltitude')
         }
 
     return result
@@ -222,6 +232,7 @@ def generate_new_fields(df_images):
     """
     df_images['LATITUDE_PREV'] = df_images['LATITUDE'].shift(1, fill_value=df_images['LATITUDE'].iloc[0])
     df_images['LONGITUDE_PREV'] = df_images['LONGITUDE'].shift(1, fill_value=df_images['LONGITUDE'].iloc[0])
+    df_images['ALTITUDE_PREV'] = df_images['ALTITUDE'].shift(1, fill_value=df_images['ALTITUDE'].iloc[0])
 
     df_images['DISTANCE'] = df_images.apply(
         lambda x: haversine(x['LONGITUDE'], x['LATITUDE'], x['LONGITUDE_PREV'], x['LATITUDE_PREV']), axis=1)
@@ -244,15 +255,20 @@ def discard_track_logs(df_images, discard_distance):
 
 def get_middle_point(df_row, normalise_distance):
     if df_row['DISTANCE'] > normalise_distance and df_row['NEXT_DISTANCE'] > normalise_distance:
-        return pd.Series([
+        res = [
             (df_row[('{}_next'.format(key)).upper()] + df_row[('{}_prev'.format(key)).upper()]) / 2
             for key in ['LATITUDE', 'LONGITUDE']
-        ])
+        ]
+        if df_row['ALTITUDE_PREV'] and df_row['ALTITUDE_NEXT']:
+            res.append((df_row['ALTITUDE_NEXT'] + df_row['ALTITUDE_PREV']) / 2)
+        else:
+            res.append(None)
     else:
-        return pd.Series([
+        res = [
             df_row[key]
-            for key in ['LATITUDE', 'LONGITUDE']
-        ])
+            for key in ['LATITUDE', 'LONGITUDE', 'ALTITUDE']
+        ]
+    return pd.Series(res)
 
 
 def normalise_track_logs(df_images, normalise_distance):
@@ -263,8 +279,9 @@ def normalise_track_logs(df_images, normalise_distance):
     df_images_len = len(df_images.index) - 1
     df_images['LATITUDE_NEXT'] = df_images['LATITUDE'].shift(-1, fill_value=df_images['LATITUDE'][df_images_len])
     df_images['LONGITUDE_NEXT'] = df_images['LONGITUDE'].shift(-1, fill_value=df_images['LONGITUDE'][df_images_len])
+    df_images['ALTITUDE_NEXT'] = df_images['ALTITUDE'].shift(-1, fill_value=df_images['ALTITUDE'][df_images_len])
 
-    df_images[['LATITUDE', 'LONGITUDE']] = df_images.apply(lambda x: get_middle_point(x, normalise_distance), axis=1)
+    df_images[['LATITUDE', 'LONGITUDE', 'ALTITUDE']] = df_images.apply(lambda x: get_middle_point(x, normalise_distance), axis=1)
 
     return df_images
 
@@ -348,7 +365,7 @@ def geo_tagger(args):
     if not track_logs:
         print("""Track Logs are empty. So using geo values from image.""")
 
-    df_images[['GPS_DATETIME', 'LATITUDE', 'LONGITUDE']] = \
+    df_images[['GPS_DATETIME', 'LATITUDE', 'LONGITUDE', 'ALTITUDE']] = \
         df_images.apply(lambda x: get_geo_data_from_log(x, track_logs), axis=1, result_type='expand')
 
     df_images = df_images.query('LATITUDE.notnull() or LONGITUDE.notnull()', engine='python')
@@ -379,6 +396,10 @@ def geo_tagger(args):
             et.execute(bytes('-GPSLongitude={0}'.format(row[1]['LONGITUDE']), 'utf-8'),
                        bytes("{0}".format(row[1]['IMAGE_NAME']), 'utf-8'))
 
+            if row[1]['ALTITUDE']:
+                et.execute(bytes('-ALTITUDE={0}'.format(row[1]['ALTITUDE']), 'utf-8'),
+                           bytes("{0}".format(row[1]['IMAGE_NAME']), 'utf-8'))
+
     clean_up_new_files(output_photo_directory, [image for image in df_images['IMAGE_NAME'].values])
 
     input('\nMetadata successfully added to images.\n\nPress any key to quit')
@@ -407,13 +428,13 @@ if __name__ == '__main__':
                         action='store',
                         dest='discard',
                         default=0,
-                        help='Discard images which distance in meter is less than parameter')
+                        help='Discard images which distance in meter is more than parameter')
 
     parser.add_argument('-n', '--normalise',
                         action='store',
                         dest='normalise',
                         default=0,
-                        help='')
+                        help='Normalise images which distance in meter is more than parameter')
 
     parser.add_argument('-e', '--exiftool-exec-path',
                         action='store',

@@ -175,7 +175,7 @@ def load_gps_track_log(log_path):
                                     'GPS_DATETIME': point.time,
                                     'Latitude': point.latitude,
                                     'Longitude': point.longitude,
-                                    'Altitude': None
+                                    'Altitude': point.elevation
                                 }
                                 track_logs.append(track_data)
                                 loaded_points += 1

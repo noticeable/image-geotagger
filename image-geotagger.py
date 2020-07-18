@@ -391,9 +391,19 @@ def geo_tagger(args):
                            bytes("{0}".format(row[1]['IMAGE_NAME']), 'utf-8'))
                 et.execute(bytes('-GPSDateStamp={0}'.format(row[1]['GPS_DATETIME'].strftime("%Y:%m:%d")), 'utf-8'),
                            bytes("{0}".format(row[1]['IMAGE_NAME']), 'utf-8'))
+
             et.execute(bytes('-GPSLatitude={0}'.format(row[1]['LATITUDE']), 'utf-8'),
                        bytes("{0}".format(row[1]['IMAGE_NAME']), 'utf-8'))
+
+            latitude_ref = 'N' if row[1]['LATITUDE'] > 0 else 'S'
+            et.execute(bytes('-GPSLatitudeRef={0}'.format(latitude_ref), 'utf-8'),
+                       bytes("{0}".format(row[1]['IMAGE_NAME']), 'utf-8'))
+
             et.execute(bytes('-GPSLongitude={0}'.format(row[1]['LONGITUDE']), 'utf-8'),
+                       bytes("{0}".format(row[1]['IMAGE_NAME']), 'utf-8'))
+
+            longitude_ref = 'E' if row[1]['LONGITUDE'] > 0 else 'W'
+            et.execute(bytes('-GPSLongitudeRef={0}'.format(longitude_ref), 'utf-8'),
                        bytes("{0}".format(row[1]['IMAGE_NAME']), 'utf-8'))
 
             if row[1]['ALTITUDE']:

@@ -407,7 +407,10 @@ def geo_tagger(args):
                        bytes("{0}".format(row[1]['IMAGE_NAME']), 'utf-8'))
 
             if row[1]['ALTITUDE']:
+                altitude_ref = '0' if row[1]['ALTITUDE'] > 0 else '1'
                 et.execute(bytes('-GPSAltitude={0}'.format(row[1]['ALTITUDE']), 'utf-8'),
+                           bytes("{0}".format(row[1]['IMAGE_NAME']), 'utf-8'))
+                et.execute(bytes('-GPSAltitudeRef={0}'.format(altitude_ref), 'utf-8'),
                            bytes("{0}".format(row[1]['IMAGE_NAME']), 'utf-8'))
 
     clean_up_new_files(output_photo_directory, [image for image in df_images['IMAGE_NAME'].values])

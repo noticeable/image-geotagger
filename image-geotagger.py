@@ -135,7 +135,7 @@ def load_gps_track_log(log_path):
     support kml, gpx and exif csv file.
     """
     file_type = validate_file_type(log_path)
-    track_logs = []
+    track_logs = {}
     loaded_points = 0
     removed_points = 0
 
@@ -158,7 +158,7 @@ def load_gps_track_log(log_path):
                         'Longitude': float(longitude),
                         'Altitude': float(altitude) if altitude else None
                     })
-                    track_logs.append(i)
+                    track_logs[new_date_time.strftime('%Y:%m:%d %H:%M:%S')] = i
                     loaded_points += 1
                 else:
                     removed_points += 1
@@ -177,7 +177,7 @@ def load_gps_track_log(log_path):
                                     'Longitude': point.longitude,
                                     'Altitude': point.elevation
                                 }
-                                track_logs.append(track_data)
+                                track_logs[point.time.strftime('%Y:%m:%d %H:%M:%S')] = track_data
                                 loaded_points += 1
                             else:
                                 removed_points += 1
@@ -185,7 +185,6 @@ def load_gps_track_log(log_path):
             except Exception as e:
                 return False
     print('Loaded Points : {} \n\nRemoved Points: {}'.format(loaded_points, removed_points))
-    track_logs = sorted(track_logs, key=lambda t_log: t_log['GPS_DATETIME'])
     return track_logs
 
 
@@ -194,9 +193,8 @@ def get_geo_data_from_log(df_row, track_logs):
     Find match geo data from log
     """
     if track_logs:
-        track_idx = df_row.name
-        if len(track_logs) > track_idx:
-            current_track = track_logs[track_idx]
+        current_track = track_logs.get(df_row['ORIGINAL_DATETIME'])
+        if current_track:
             altitude = current_track.get('Altitude')
             result = {
                 'GPS_DATETIME': current_track.get('GPS_DATETIME'),
@@ -208,12 +206,12 @@ def get_geo_data_from_log(df_row, track_logs):
                 df_row['ORIGINAL_DATETIME'], result['GPS_DATETIME'].strftime("%Y:%m:%d %H:%M:%S")))
         else:
             result = {
-                'GPS_DATETIME': None,
-                'Latitude': None,
-                'Longitude': None,
-                'Altitude': None
+                'GPS_DATETIME': datetime.datetime.strptime(df_row['ORIGINAL_DATETIME'], '%Y:%m:%d %H:%M:%S'),
+                'Latitude': df_row['METADATA'].get('Composite:GPSLatitude'),
+                'Longitude': df_row['METADATA'].get('Composite:GPSLongitude'),
+                'Altitude': df_row['METADATA'].get('Composite:GPSAltitude')
             }
-            print("Can not set image: {} as track log are not enough to update.".format(df_row['IMAGE_NAME']))
+            print("There is no matching log with file: {}".format(df_row['IMAGE_NAME']))
     else:
         result = {
             'GPS_DATETIME': 0,
@@ -356,7 +354,7 @@ def geo_tagger(args):
     df_images.sort_values('ORIGINAL_DATETIME', axis=0, ascending=True, inplace=True)
     df_images = df_images.reset_index(drop=True)
 
-    track_logs = []
+    track_logs = {}
     if log_path:
         # Work with the resulting image dataframe to filter by time discard or normalise
         track_logs = load_gps_track_log(log_path)
@@ -391,13 +389,26 @@ def geo_tagger(args):
                            bytes("{0}".format(row[1]['IMAGE_NAME']), 'utf-8'))
                 et.execute(bytes('-GPSDateStamp={0}'.format(row[1]['GPS_DATETIME'].strftime("%Y:%m:%d")), 'utf-8'),
                            bytes("{0}".format(row[1]['IMAGE_NAME']), 'utf-8'))
+
             et.execute(bytes('-GPSLatitude={0}'.format(row[1]['LATITUDE']), 'utf-8'),
                        bytes("{0}".format(row[1]['IMAGE_NAME']), 'utf-8'))
+
+            latitude_ref = 'N' if row[1]['LATITUDE'] > 0 else 'S'
+            et.execute(bytes('-GPSLatitudeRef={0}'.format(latitude_ref), 'utf-8'),
+                       bytes("{0}".format(row[1]['IMAGE_NAME']), 'utf-8'))
+
             et.execute(bytes('-GPSLongitude={0}'.format(row[1]['LONGITUDE']), 'utf-8'),
                        bytes("{0}".format(row[1]['IMAGE_NAME']), 'utf-8'))
 
+            longitude_ref = 'E' if row[1]['LONGITUDE'] > 0 else 'W'
+            et.execute(bytes('-GPSLongitudeRef={0}'.format(longitude_ref), 'utf-8'),
+                       bytes("{0}".format(row[1]['IMAGE_NAME']), 'utf-8'))
+
             if row[1]['ALTITUDE']:
+                altitude_ref = '0' if row[1]['ALTITUDE'] > 0 else '1'
                 et.execute(bytes('-GPSAltitude={0}'.format(row[1]['ALTITUDE']), 'utf-8'),
+                           bytes("{0}".format(row[1]['IMAGE_NAME']), 'utf-8'))
+                et.execute(bytes('-GPSAltitudeRef={0}'.format(altitude_ref), 'utf-8'),
                            bytes("{0}".format(row[1]['IMAGE_NAME']), 'utf-8'))
 
     clean_up_new_files(output_photo_directory, [image for image in df_images['IMAGE_NAME'].values])
